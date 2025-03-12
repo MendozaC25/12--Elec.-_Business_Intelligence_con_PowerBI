@@ -1,0 +1,32 @@
+let
+    fnCalendarioEspanol = (FechaInicio as date, FechaFinal as date, optional MesAñoFiscal as number) as table =>
+    let 
+        FiscalYearStartMonth = if MesAñoFiscal = null then 1 else MesAñoFiscal,
+        AdjustedStartDate = if Date.Month(FechaInicio) < FiscalYearStartMonth 
+                            then #date(Date.Year(FechaInicio) - 1, FiscalYearStartMonth, 1) 
+                            else #date(Date.Year(FechaInicio), FiscalYearStartMonth, 1),
+        DayCount = Duration.Days(Duration.From(FechaFinal - AdjustedStartDate)) + 1,
+        Source = List.Dates(AdjustedStartDate, DayCount, #duration(1,0,0,0)),
+        #"Converted to Table" = Table.FromList(Source, Splitter.SplitByNothing(), null, null, ExtraValues.Error),
+        #"Changed Type" = Table.TransformColumnTypes(#"Converted to Table",{{"Column1", type date}}),
+        #"Renamed Columns" = Table.RenameColumns(#"Changed Type",{{"Column1", "Fecha"}}),
+        #"Inserted Year" = Table.AddColumn(#"Renamed Columns", "Año", each Date.Year([Fecha]), Int64.Type),
+        #"Inserted Quarter" = Table.AddColumn(#"Inserted Year", "Trimestre", each Date.QuarterOfYear([Fecha]), Int64.Type),
+        #"Inserted Merged Column" = Table.AddColumn(#"Inserted Quarter", "Trimestre (C)", each Text.Combine({"T", Text.From([Trimestre], "es-ES")}), type text),
+        #"Inserted Month" = Table.AddColumn(#"Inserted Merged Column", "Mes Numero ", each Date.Month([Fecha]), Int64.Type),
+        #"Inserted Month Name" = Table.AddColumn(#"Inserted Month", "Mes", each Text.Proper(Date.MonthName([Fecha], "es-ES")), type text),
+        #"Duplicated Column" = Table.DuplicateColumn(#"Inserted Month Name", "Mes", "Mes - Copia"),
+        #"Renamed Columns1" = Table.RenameColumns(#"Duplicated Column",{{"Mes - Copia", "Mes (C)"}}),
+        #"Extracted First Characters" = Table.TransformColumns(#"Renamed Columns1", {{"Mes (C)", each Text.Start(_, 3), type text}}),
+        #"Inserted Week of Year" = Table.AddColumn(#"Extracted First Characters", "Semana del Año", each Date.WeekOfYear([Fecha]), Int64.Type),
+        #"Inserted Merged Column1" = Table.AddColumn(#"Inserted Week of Year", "Semana del Año (C)", each Text.Combine({"Sem-", Text.From([Semana del Año], "es-ES")}), type text),
+        #"Inserted Day of Week" = Table.AddColumn(#"Inserted Merged Column1", "Dia de Semana", each Date.DayOfWeek([Fecha], Day.Monday) + 1, Int64.Type),
+        #"Inserted Day Name" = Table.AddColumn(#"Inserted Day of Week", "Dia", each Text.Proper(Date.DayOfWeekName([Fecha], "es-ES")), type text),
+        #"Duplicated Column2" = Table.DuplicateColumn(#"Inserted Day Name", "Dia", "Dia (C)"),
+        #"Extracted First Characters1" = Table.TransformColumns(#"Duplicated Column2", {{"Dia (C)", each Text.Start(_, 3), type text}}),
+	#"Jul-Jun" = Table.AddColumn(#"Extracted First Characters1", "Jul-Jun", each if Date.Month ([Fecha])<=6 then Number.ToText(Date.Year([Fecha])-1) & "-" & Number.ToText(Date.Year		([Fecha])) else Number.ToText(Date.Year([Fecha])) & "-" & Number.ToText(Date.Year([Fecha])+1) ,type text),
+        #"Q Jul-Jun" = Table.AddColumn(#"Jul-Jun", "Q Jul-Jun", each if Date.Month ([Fecha])<=6 then "Q " & Number.ToText(Date.QuarterOfYear([Fecha])+2) else "Q " & Number.ToText			(Date.QuarterOfYear([Fecha])-2), type text)
+    in
+        #"Q Jul-Jun"
+in
+    fnCalendarioEspanol
